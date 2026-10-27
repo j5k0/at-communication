@@ -1,5 +1,6 @@
-#include "../include/serial_utils.h"
+#include "serial_utils.h"
 #include "argument_parser.h"
+#include "output_utils.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -8,20 +9,26 @@
 #include <termios.h>
 #include <unistd.h>
 
+#define READ_TIMEOUT_DS 5
+
 int serial_open(char *port){
     if(arguments.mock){
         int mock_file = open(arguments.mock_path, O_RDONLY);
         if(mock_file < 0){
-            printf("Error %i from open: %s\n", errno, strerror(errno));
-            return -1;
+            char err[1024] = {0};
+            snprintf(err, 1024, "Error %i from open: %s\n", errno, strerror(errno));
+            print_error(err, "serial_open", -1);
+            return 1;
         }
         return mock_file;
     }
     
     int serial_port = open(port, O_RDWR);
     if(serial_port < 0){
-        printf("Error %i from open: %s\n", errno, strerror(errno));
-        return -1;
+        char err[1024] = {0};
+        snprintf(err, 1024, "Error %i from open: %s\n", errno, strerror(errno));
+        print_error(err, "serial_open", -1);
+        return 1;
     }
     return serial_port;
 }
@@ -61,7 +68,7 @@ int serial_read(int fd, char *buffer, int nbytes){
 
 int serial_flush(int fd){
     if (tcflush(fd, TCIFLUSH) == -1) {
-        perror("tcflush failed");
+        print_error("tcflush failed", "serial_flush", -1);
     }
     return 0;
 }
@@ -72,7 +79,10 @@ int serial_configure(int fd){
 
     struct termios tty;
     if(tcgetattr(fd, &tty) != 0){
-        printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
+        char err[1024] = {0};
+        snprintf(err, 1024, "Error %i from tcgettr: %s\n", errno, strerror(errno));
+        print_error(err, "serial_configure", -1);
+        return 1;
     }
 
     tty.c_cflag &= ~PARENB; // clear parity bit
@@ -92,15 +102,18 @@ int serial_configure(int fd){
     tty.c_oflag &= ~OPOST; // Prevent special interpretation of output bytes (e.g. newline chars)
     tty.c_oflag &= ~ONLCR; // Prevent conversion of newline to carriage return/line feed
 
-    tty.c_cc[VTIME] = 5;    // Wait for up to 2s, returning as soon as any data is received.
+    tty.c_cc[VTIME] = READ_TIMEOUT_DS;    // Wait for up to 0.5 seconds (5 deciseconds)
     tty.c_cc[VMIN] = 0;
 
     cfsetispeed(&tty, B115200);
     cfsetospeed(&tty, B115200);
 
-    if(tcsetattr(fd, TCSANOW, &tty) != 0){
-        printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
-        return errno;
+    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
+        char err[1024] = {0};
+        snprintf(err, 1024, "Error %i from tcsetattr: %s\n", errno, strerror(errno));
+        print_error(err, "serial_configure", -1);
+        close(fd);
+        return 1;
     }
     return 0;
 }

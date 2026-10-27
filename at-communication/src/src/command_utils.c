@@ -8,8 +8,6 @@
 #include <string.h>
 #include <time.h>
 
-#define MAX_BUFFER_SIZE 1024*10
-
 static int check_error(char *line){
     if(strncmp("ERROR", line, 5) == 0){
         print_error("Encountered an error", "Unknown", 0);
@@ -46,6 +44,11 @@ int query_command(char *command, int timeout, int attempts, char ***response, in
     if(fd < 0){
         return 1;
     }
+    
+    ret = serial_configure(fd);
+    if(ret != 0)
+        return 1;
+
     for(int i=0; i<attempts; i++){
         ret = get_lines(fd, command, timeout, response, lines);
         if(ret == 1){
@@ -58,7 +61,7 @@ int query_command(char *command, int timeout, int attempts, char ***response, in
         }
     }
 
-    print_error("Timeout", "Unknown", -1);
+    print_error("Timeout", "query_command", -1);
     serial_close(fd);
     return 1;
 }
@@ -66,13 +69,17 @@ int query_command(char *command, int timeout, int attempts, char ***response, in
 int get_spec_lines(char *prefix, char **lines, int line_count, char ***spec_lines, int *spec_count){
     *spec_count = 0;
     *spec_lines = calloc(line_count, sizeof(char *));
+    if(spec_lines == NULL){
+        print_error("Failed to allocate memory", "get_spec_lines", -1);
+        return COMMAND_STATUS_ERROR;
+    }
     for(int i=0; i<line_count; i++){
         if(strncmp(lines[i], prefix, strlen(prefix)) == 0){
             *spec_lines[*spec_count] = lines[i];
             *spec_count = *spec_count + 1;
         }
     }
-    return 0;
+    return COMMAND_STATUS_OK;
 }
 
 int get_lines(int fd, char *command, double timeout, char ***lines, int *line_count){
@@ -90,11 +97,15 @@ int get_lines(int fd, char *command, double timeout, char ***lines, int *line_co
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     *lines = calloc(MAX_RESPONSE_LINES, sizeof(char *));
+    if(lines == NULL){
+        print_error("Failed to allocate memory", "get_lines", -1);
+        return COMMAND_STATUS_ERROR;
+    }
     int offset = 0;
 
     int run = 1;
     while(run){
-        char *tmp = calloc(MAX_BUFFER_SIZE, sizeof(char));
+        char *tmp = calloc(SERIAL_MAX_READ_BYTES, sizeof(char));
         serial_read(fd, tmp, SERIAL_MAX_READ_BYTES);
         split_lines(tmp, lines, line_count, &offset);
         int status = check_end_conditions(*lines, *line_count);
@@ -107,7 +118,7 @@ int get_lines(int fd, char *command, double timeout, char ***lines, int *line_co
         clock_gettime(CLOCK_MONOTONIC, &end);
         time_t seconds = end.tv_sec - start.tv_sec;
         time_t nanoseconds = end.tv_nsec - start.tv_nsec;
-        cpu_time = seconds * 1000.0 + nanoseconds / 100000.0; // convert to milliseconds
+        cpu_time = seconds * 1000.0 + nanoseconds / 100000.0;
         if(cpu_time > timeout)
             return COMMAND_STATUS_TIMEOUT;
     }
