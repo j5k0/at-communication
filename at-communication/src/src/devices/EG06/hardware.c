@@ -12,7 +12,17 @@ int EG06_get_temperature(){
     int status = query_command("AT+QTEMP", 1000, 3, &lines, &n);
     if(status != 0)
         goto cleanup;
-    groups = separate_fields_single(lines[1] + strlen("+QTEMP: "), ',', "", "", &g);
+
+    int start = seek_line(lines, n, "+QTEMP: ");
+    if(start < 0){
+        print_error("Failed to find response line", "Parser", -1);
+        goto cleanup;
+    }
+
+    status = separate_groups(lines[start] + strlen("+QTEMP: "), &groups, ',', "", "", &g);
+    if(status != PARSER_STATUS_OK)
+        goto cleanup;
+
     temperatures_t temps = { atoi(groups[0]), atoi(groups[1]), atoi(groups[2]) };
     print_temperature(temps);
 

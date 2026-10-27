@@ -2,7 +2,7 @@
 #include "command_utils.h"
 #include "output_utils.h"
 #include "devices/EG06/commands.h"
-#include "devices/EG06/parse_utils.h"
+#include "devices/EG06/cell_parsers.h"
 #include "types.h"
 
 #include <stdlib.h>
@@ -14,9 +14,14 @@ int EG06_get_service_cells(){
     int status = query_command("AT+QENG=\"servingcell\"", 1000, 3, &lines, &n);
     if(status != 0)
         goto cleanup;
+    int start = seek_line(lines, n, "+QENG: ");
+    if(start < 0){
+        print_error("Failed to find response line", "seek_line", -1);
+        goto cleanup;
+    }
 
     serving_cell_t serving;
-    get_serving_cell(lines[1], &serving);
+    get_serving_cell(lines[start], &serving);
     print_serving_cell(&serving);
 
 cleanup:
@@ -34,7 +39,12 @@ int EG06_get_neighbour_cells(){
         goto cleanup;
 
     serving_cell_t service;
-    int service_mode = get_serving_cell(lines[1], &service);
+    int start = seek_line(lines, n, "+QENG: ");
+    if(start < 0){
+        print_error("Failed to find response line", "seek_line", -1);
+        goto cleanup;
+    }
+    int service_mode = get_serving_cell(lines[start], &service);
 
     free_lines(lines, n);
     lines = NULL;
@@ -43,10 +53,19 @@ int EG06_get_neighbour_cells(){
     status = query_command("AT+QENG=\"neighbourcell\"", 5000, 3, &lines, &n);
     if(status != 0)
         goto cleanup;
+    start = seek_line(lines, n, "+QENG: ");
+    if(start < 0){
+        print_error("Failed to find response line", "seek_line", -1);
+        goto cleanup;
+    }
 
     int cells_c = 0;
     cells = calloc(n, sizeof(neighbour_cell_t));
-    for(int i=0; i<n; i++){
+    if(cells == NULL){
+        print_error("Failed to allocate memory", "calloc", -1);
+        goto cleanup;
+    }
+    for(int i=start; i<n; i++){
         neighbour_cell_t tmp;
         if(service_mode == 0)
             ret = get_neighbour_cell_lte(lines[i], &tmp);
@@ -54,6 +73,7 @@ int EG06_get_neighbour_cells(){
             ret = get_neighbour_cell_wcdma(lines[i], &tmp);
 
         if(ret == 0) cells[cells_c++] = tmp;
+        else goto cleanup;
     }
 
     print_neighbour_cells(cells, cells_c);
@@ -72,17 +92,31 @@ int EG06_get_operators(){
     if(status != 0)
         goto cleanup;
 
-    groups = separate_fields_single(lines[1] + strlen("+COPS: "), ',', "\"(", "\")", &g);
+    int start = seek_line(lines, n, "+COPS: ");
+    if(start < 0){
+        print_error("Failed to find response line", "seek_line", -1);
+        goto cleanup;
+    }
+    status = separate_groups(lines[start] + strlen("+COPS: "), &groups, ',', "\"(", "\")", &g);
+    if(status != PARSER_STATUS_OK)
+        goto cleanup;
 
     int operator_count = 0;
     for(int i=0; i<g && strlen(groups[i]) != 0; i++)
         operator_count++;
 
     ops = calloc(operator_count, sizeof(operator_t));
+    if(ops == NULL){
+        print_error("Failed to allocate memory", "calloc", -1);
+        goto cleanup;
+    }
 
     for(int i=0; i<operator_count; i++){
         int subgroup_count = 0;
-        char **subgroups = separate_fields_single(groups[i], ',', "\"", "\"", &subgroup_count);
+        char **subgroups = NULL;
+        status = separate_groups(groups[i], &subgroups, ',', "\"", "\"", &subgroup_count);
+        if(status != PARSER_STATUS_OK)
+            goto cleanup;
         ops[i].status = atoi(subgroups[0]);
         strncpy(ops[i].alphanumeric_l, subgroups[1], sizeof(ops[i].alphanumeric_l));
         strncpy(ops[i].alphanumeric, subgroups[2], sizeof(ops[i].alphanumeric));
@@ -106,7 +140,14 @@ int EG06_get_operator(){
     if(status != 0)
         goto cleanup;
 
-    groups = separate_fields_single(lines[1] + strlen("+COPS: "), ',', "\"(", "\")", &g);
+    int start = seek_line(lines, n, "+COPS: ");
+    if(start < 0){
+        print_error("Failed to find response line", "seek_line", -1);
+        goto cleanup;
+    }
+    status = separate_groups(lines[start] + strlen("+COPS: "), &groups, ',', "\"(", "\")", &g);
+    if(status != PARSER_STATUS_OK)
+        goto cleanup;
 
     if(g > 1){
         operator_t op = { -1, -1, -1, "", "", "" };

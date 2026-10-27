@@ -7,16 +7,15 @@
 #include "error_type.h"
 
 enum ParserStatus{
-    PARSER_STATUS_SEEKING,
-    PARSER_STATUS_PARSING,
-    PARSER_STATUS_DONE,
+    PARSER_STATUS_OK,
     PARSER_STATUS_ERROR,
     __PARSER_STATUS_MAX
 };
 
 void free_lines(char **lines, int count);
-char** separate_fields_single(char *line, char delimiter, char *group_open, char *group_close, int *group_count);
-void split_lines(char *buffer, char ***lineArray, int *count, int *offset);
+int separate_groups(char *line, char ***groups, char delimiter, char *group_open, char *group_close, int *group_count);
+int seek_line(char **lines, int count, char *line);
+int split_lines(char *buffer, char ***lineArray, int *count, int *offset);
 
 extern struct ErrorEntry *cme_errors_map;
 extern int cme_size;

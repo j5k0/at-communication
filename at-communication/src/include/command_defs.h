@@ -5,14 +5,11 @@
 
 extern int (*get_band)();
 extern int (*get_modem_info)();
-extern int (*get_number)();
 extern int (*get_operator)();
 extern int (*get_imei)();
 extern int (*get_temperature)();
 extern int (*get_operators)();
 extern int (*get_service_cells)();
 extern int (*get_neighbour_cells)();
-extern int (*send_message)();
-extern int (*list_messages)();
 
 #endif

@@ -7,8 +7,11 @@ int get_serving_cell(char *line, serving_cell_t *cell){
     if(strncmp(line, "+QENG: ", 7) != 0)
         return -1;
 
-    int group_count;
-    char **groups = separate_fields_single(line + strlen("+QENG: "), ',', "\"", "\"", &group_count);
+    int group_count = 0;
+    char **groups = NULL;
+    int status = separate_groups(line + strlen("+QENG: "), &groups, ',', "\"", "\"", &group_count);
+    if(status != 0)
+        return status;
 
     if(strcmp(groups[2], "LTE") == 0){
         cell->mode = LTE_S_LTE; 
@@ -58,8 +61,11 @@ int get_neighbour_cell_lte(char *line, neighbour_cell_t *cell){
     if(strncmp(line, "+QENG: ", 7) != 0)
         return -1;
 
-    int group_count;
-    char **groups = separate_fields_single(line + strlen("+QENG: "), ',', "\"", "\"", &group_count);
+    int group_count = 0;
+    char **groups = NULL;
+    int status = separate_groups(line + strlen("+QENG: "), &groups, ',', "\"", "\"", &group_count);
+    if(status != 0)
+        return status;
 
     if(strcmp(groups[0], "neighbourcell intra") == 0){
         cell->mode = LTE_N_INTRA_LTE;
@@ -116,8 +122,11 @@ int get_neighbour_cell_wcdma(char *line, neighbour_cell_t *cell){
     if(strncmp(line, "+QENG: ", 7) != 0)
         return -1;
 
-    int group_count;
-    char **groups = separate_fields_single(line + strlen("+QENG: "), ',', "\"", "\"", &group_count);
+    int group_count = 0;
+    char **groups = NULL;
+    int status = separate_groups(line + strlen("+QENG: "), &groups, ',', "\"", "\"", &group_count);
+    if(status != 0)
+        return status;
 
     if(strcmp(groups[1], "WCDMA") == 0){
         cell->mode = WCDMA_N_WCDMA;

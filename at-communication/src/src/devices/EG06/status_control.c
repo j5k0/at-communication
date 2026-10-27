@@ -13,7 +13,15 @@ int EG06_get_band(){
     if(status != 0)
         goto cleanup;
 
-    groups = separate_fields_single(lines[1] + strlen("+QCFG: "), ',', "\"", "\"", &g);
+    int start = seek_line(lines, n, "+QCFG: ");
+    if(start < 0){
+        print_error("Failed to find response line", "seek_line", -1);
+        goto cleanup;
+    }
+    status = separate_groups(lines[start] + strlen("+QCFG: "), &groups, ',', "\"", "\"", &g);
+    if(status < 0)
+        goto cleanup;
+    
     bands_t bands;
     strncpy(bands.bandval, groups[1], sizeof(bands.bandval));
     strncpy(bands.ltebandval, groups[2], sizeof(bands.ltebandval));

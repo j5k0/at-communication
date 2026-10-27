@@ -30,15 +30,6 @@ int main(int argc, char **argv){
     if(arguments.ops)
         get_operators();
 
-    if(arguments.message)
-        send_message();
-
-    if(arguments.messages)
-        list_messages();
-
-    if(arguments.number)
-        get_number();
-
     if(arguments.neighbour)
         get_neighbour_cells();
 
